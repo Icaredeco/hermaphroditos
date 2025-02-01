@@ -3,6 +3,7 @@ import replicate
 import os
 import asyncio
 import nest_asyncio
+from asgiref.wsgi import WsgiToAsgi  # Adaptateur WSGI vers ASGI
 
 app = Flask(__name__)
 
@@ -17,10 +18,7 @@ async def generate_image():
         return jsonify({"error": "Clé API Replicate manquante"}), 500
     os.environ["REPLICATE_API_TOKEN"] = replicate_api_token
 
-    # Modèle SDXL avec le commit hash spécifié
     model = "stability-ai/sdxl:7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc"
-
-    # Paramètres de génération
     params = {
         "prompt": prompt,
         "negative_prompt": "flou, peu détaillé, réaliste",
@@ -31,19 +29,20 @@ async def generate_image():
         "scheduler": "K_EULER_ANCESTRAL",
     }
 
-    # Exécution de la génération dans un thread séparé
+    # Exécute la génération dans un thread séparé
     output = await asyncio.to_thread(replicate.run, model, input=params)
 
-    # Récupérer l'URL de l'image générée
     if isinstance(output, list):
         image_url = output[0]
     else:
         image_url = output.get()
+
     print(f"Image URL : {image_url}")
-    
     return jsonify({'image_url': image_url})
+
+# Conversion de l'application Flask en application ASGI accessible par Uvicorn
+asgi_app = WsgiToAsgi(app)
 
 if __name__ == '__main__':
     nest_asyncio.apply()
-    # Pour le développement local (pas pour Render)
     app.run(host="0.0.0.0", port=5000)
